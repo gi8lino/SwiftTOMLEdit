@@ -155,15 +155,20 @@ it uses the XCFramework from the latest release.
 
 ## Releases
 
-Releases are created entirely by GitHub Actions:
+Create a version tag locally and push it:
 
-1. Open **Actions → Release → Run workflow**.
-2. Select the `main` branch.
-3. Enter a semantic version such as `0.1.0` and run the workflow.
+```bash
+make tag-patch # or tag-minor / tag-major
+make push-tags
+```
 
-The workflow builds and tests the Rust and Swift code, packages the XCFramework, computes
-its checksum, updates `Package.swift`, creates the release commit and tag, and publishes
-the ZIP with SHA-256 and SwiftPM checksum files. No local artifact preparation is needed.
+Pushing a `v*` tag triggers the Release workflow. It checks out that exact tag, builds and
+tests the Rust and Swift code, packages the XCFramework, computes its checksums, and creates
+the GitHub Release with the ZIP, SHA-256, and SwiftPM checksum files. No local artifact
+packaging is needed.
+
+An existing tag can be recovered without moving it from **Actions → Release → Run
+workflow** by entering the full tag, such as `v0.0.2`.
 
 ## License
 

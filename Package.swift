@@ -7,8 +7,9 @@ let strictConcurrencySettings: [SwiftSetting] = [
   .enableUpcomingFeature("StrictConcurrency")
 ]
 
-// Updated by the release workflow. During native development, `make artifact`
-// creates the local XCFramework and SwiftPM uses it automatically.
+// During native development, `make artifact` creates the local XCFramework and
+// SwiftPM uses it automatically. Release metadata is updated separately when
+// switching the package to a newly published binary.
 let releaseTag = "v0.0.1"
 let releaseChecksum = "02b07f0326f86e9b0fd2a3df3d8c1df1ac2c9f996cf66510ff1d52311b855861"
 let localArtifactPath = "Artifacts/CSwiftTOMLEdit.xcframework"
