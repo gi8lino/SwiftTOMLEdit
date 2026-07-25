@@ -297,7 +297,8 @@ count = 3
     #[test]
     fn edit_preserves_comments_and_spacing() {
         let source = "# Heading\n[app]\nmode   = \"month\" # Keep\n";
-        let request = r#"{"edits":[{"path":["app","mode"],"value":{"kind":"string","value":"week"}}]}"#;
+        let request =
+            r#"{"edits":[{"path":["app","mode"],"value":{"kind":"string","value":"week"}}]}"#;
 
         let output = edit_text(source, request).expect("edit should succeed");
         assert_eq!(output, "# Heading\n[app]\nmode   = \"week\" # Keep\n");

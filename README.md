@@ -9,40 +9,17 @@ when existing values are changed.
 
 - macOS 14 or newer
 - Xcode 16 or newer
-- Rust with `rustup`
 
-The package contains a generated universal macOS XCFramework. The XCFramework must be
-committed because SwiftPM resolves binary targets before it can run project build scripts.
-CI regenerates the artifact and fails when the committed copy is stale.
+Rust with `rustup` is only required when changing or testing the native Rust bridge.
 
-## Initial repository setup
-
-Extract the project, then run:
-
-```bash
-make prepare
-```
-
-This builds the native library, generates `Cargo.lock`, runs the Swift and Rust tests,
-and creates:
-
-```text
-Artifacts/CSwiftTOMLEdit.xcframework
-```
-
-Commit both `Cargo.lock` and the generated XCFramework with the source before pushing or
-tagging the repository:
-
-```bash
-git init
-git add .
-git commit -m "feat: initialize SwiftTOMLEdit"
-git branch -M main
-git remote add origin git@github.com:gi8lino/SwiftTOMLEdit.git
-git push -u origin main
-```
+Release builds use a universal macOS XCFramework published as a GitHub release asset.
+SwiftPM downloads that artifact automatically; package users and release maintainers do
+not need to build or commit it locally.
 
 ## Add the package
+
+In Xcode, add `https://github.com/gi8lino/SwiftTOMLEdit` as a package dependency, or add
+it to `Package.swift`:
 
 ```swift
 .package(
@@ -148,7 +125,7 @@ let enabled = try calendar.bool("enabled", fallback: true)
 
 ## Development
 
-Build the native artifact:
+Rust bridge changes can be built and tested locally:
 
 ```bash
 make artifact
@@ -172,19 +149,21 @@ Print its SwiftPM checksum:
 make checksum
 ```
 
+The generated `Artifacts/CSwiftTOMLEdit.xcframework` directory and release ZIP are ignored
+by Git. When the local XCFramework exists, `Package.swift` uses it automatically; otherwise
+it uses the XCFramework from the latest release.
+
 ## Releases
 
-Before creating a tag, regenerate the artifact and commit any change:
+Releases are created entirely by GitHub Actions:
 
-```bash
-make verify
-git diff --exit-code -- Artifacts/CSwiftTOMLEdit.xcframework
-git tag -a v0.1.0 -m "Release v0.1.0"
-git push --follow-tags
-```
+1. Open **Actions → Release → Run workflow**.
+2. Select the `main` branch.
+3. Enter a semantic version such as `0.1.0` and run the workflow.
 
-The release workflow rebuilds and verifies the XCFramework, runs Swift and Rust tests,
-and publishes the zipped XCFramework with SHA-256 and SwiftPM checksum files.
+The workflow builds and tests the Rust and Swift code, packages the XCFramework, computes
+its checksum, updates `Package.swift`, creates the release commit and tag, and publishes
+the ZIP with SHA-256 and SwiftPM checksum files. No local artifact preparation is needed.
 
 ## License
 

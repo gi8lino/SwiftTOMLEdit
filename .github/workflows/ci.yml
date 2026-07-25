@@ -44,17 +44,6 @@ jobs:
       - name: Regenerate and test
         run: make verify
 
-      - name: Verify committed XCFramework
-        shell: bash
-        run: |
-          test -f Artifacts/CSwiftTOMLEdit.xcframework/Info.plist
-          status="$(git status --porcelain --untracked-files=all -- Rust/SwiftTOMLEdit/Cargo.lock Artifacts/CSwiftTOMLEdit.xcframework)"
-          if [ -n "$status" ]; then
-            echo "$status"
-            echo "Cargo.lock or the committed XCFramework is missing or stale." >&2
-            exit 1
-          fi
-
       - name: Package XCFramework
         run: make package
 
