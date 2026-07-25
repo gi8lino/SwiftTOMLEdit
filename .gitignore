@@ -1,0 +1,6 @@
+.build/
+dist/*
+!dist/.gitkeep
+Rust/SwiftTOMLEdit/target/
+.swiftpm/
+.DS_Store

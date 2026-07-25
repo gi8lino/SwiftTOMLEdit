@@ -1,0 +1,17 @@
+[package]
+name = "swift-toml-edit"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Rust toml_edit bridge for the SwiftTOMLEdit package"
+repository = "https://github.com/gi8lino/SwiftTOMLEdit"
+publish = false
+
+[lib]
+name = "swift_toml_edit"
+crate-type = ["staticlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml_edit = "0.25"

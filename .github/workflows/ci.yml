@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-26
+
+    env:
+      XCODE_VERSION: "26"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            .build/native-toml/rust-target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Rust/SwiftTOMLEdit/Cargo.lock') }}
+          restore-keys: |
+            rust-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Regenerate and test
+        run: make verify
+
+      - name: Verify committed XCFramework
+        shell: bash
+        run: |
+          test -f Artifacts/CSwiftTOMLEdit.xcframework/Info.plist
+          status="$(git status --porcelain --untracked-files=all -- Rust/SwiftTOMLEdit/Cargo.lock Artifacts/CSwiftTOMLEdit.xcframework)"
+          if [ -n "$status" ]; then
+            echo "$status"
+            echo "Cargo.lock or the committed XCFramework is missing or stale." >&2
+            exit 1
+          fi
+
+      - name: Package XCFramework
+        run: make package
+
+      - name: Upload XCFramework
+        uses: actions/upload-artifact@v7
+        with:
+          name: CSwiftTOMLEdit-xcframework
+          path: dist/CSwiftTOMLEdit.xcframework.zip
+          if-no-files-found: error

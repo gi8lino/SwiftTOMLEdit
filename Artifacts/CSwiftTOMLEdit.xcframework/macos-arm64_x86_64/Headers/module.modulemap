@@ -1,0 +1,4 @@
+module CSwiftTOMLEdit {
+  header "swift_toml_edit.h"
+  export *
+}
