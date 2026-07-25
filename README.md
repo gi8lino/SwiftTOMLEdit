@@ -12,9 +12,9 @@ when existing values are changed.
 
 Rust with `rustup` is only required when changing or testing the native Rust bridge.
 
-Release builds use a universal macOS XCFramework published as a GitHub release asset.
-SwiftPM downloads that artifact automatically; package users and release maintainers do
-not need to build or commit it locally.
+The package contains a universal macOS XCFramework so SwiftPM can resolve the native
+library directly from the tagged source. GitHub Actions also publishes the XCFramework
+as a release asset.
 
 ## Add the package
 
@@ -149,9 +149,8 @@ Print its SwiftPM checksum:
 make checksum
 ```
 
-The generated `Artifacts/CSwiftTOMLEdit.xcframework` directory and release ZIP are ignored
-by Git. When the local XCFramework exists, `Package.swift` uses it automatically; otherwise
-it uses the XCFramework from the latest release.
+The generated `Artifacts/CSwiftTOMLEdit.xcframework` directory is part of the package and
+must be committed when the Rust bridge changes. Release ZIPs in `dist` are ignored by Git.
 
 ## Releases
 

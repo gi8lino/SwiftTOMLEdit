@@ -1,7 +1,6 @@
 .build/
 dist/*
 !dist/.gitkeep
-Artifacts/CSwiftTOMLEdit.xcframework/
 Rust/SwiftTOMLEdit/target/
 .swiftpm/
 .DS_Store
