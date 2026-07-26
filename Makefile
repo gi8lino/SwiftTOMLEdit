@@ -18,8 +18,7 @@ NEXT_MAJOR := $(shell python3 -c 'm,n,p=map(int,"$(CURRENT_CORE_VERSION)".split(
 
 .PHONY: help \
 	prepare artifact require-artifact test rust-test lint verify package checksum clean clean-all \
-	tag-patch tag-minor tag-major push-tags tag
-
+	release release-patch release-minor release-major version
 
 help: ## Display available targets.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -33,7 +32,7 @@ require-artifact:
 	@test -d "$(ARTIFACT)" || { echo "Missing $(ARTIFACT); run 'make artifact' first." >&2; exit 1; }
 
 test: require-artifact ## Build and run Swift tests.
-	@swift test
+	@SWIFT_TOML_EDIT_USE_LOCAL_ARTIFACT=1 swift test
 
 rust-test: ## Run Rust bridge tests.
 	@if [ -f Rust/SwiftTOMLEdit/Cargo.lock ]; then \
@@ -63,22 +62,21 @@ clean: ## Remove transient build and distribution output.
 clean-all: clean ## Also remove the generated XCFramework.
 	@rm -rf "$(ARTIFACT)"
 
-##@ Tagging
+##@ Releasing
 
-tag-patch: ## Create the next patch tag locally.
-	@git tag -a "$(VERSION_PREFIX)$(NEXT_PATCH)" -m "Release $(VERSION_PREFIX)$(NEXT_PATCH)"
-	@echo "Created tag $(VERSION_PREFIX)$(NEXT_PATCH)"
+release: ## Start a pipeline-owned release (usage: make release VERSION=0.1.0).
+	@test -n "$(VERSION)" || { echo "VERSION is required, for example: make release VERSION=0.1.0" >&2; exit 1; }
+	@gh workflow run release.yml --ref main --field version="$(VERSION)"
+	@echo "Started release $(VERSION)"
 
-tag-minor: ## Create the next minor tag locally.
-	@git tag -a "$(VERSION_PREFIX)$(NEXT_MINOR)" -m "Release $(VERSION_PREFIX)$(NEXT_MINOR)"
-	@echo "Created tag $(VERSION_PREFIX)$(NEXT_MINOR)"
+release-patch: VERSION := $(NEXT_PATCH)
+release-patch: release ## Start the next patch release.
 
-tag-major: ## Create the next major tag locally.
-	@git tag -a "$(VERSION_PREFIX)$(NEXT_MAJOR)" -m "Release $(VERSION_PREFIX)$(NEXT_MAJOR)"
-	@echo "Created tag $(VERSION_PREFIX)$(NEXT_MAJOR)"
+release-minor: VERSION := $(NEXT_MINOR)
+release-minor: release ## Start the next minor release.
 
-push-tags: ## Push commits and tags to origin.
-	@git push --follow-tags
+release-major: VERSION := $(NEXT_MAJOR)
+release-major: release ## Start the next major release.
 
-tag: ## Show latest tag.
+version: ## Show the latest released version.
 	@echo "Latest version: $(LATEST_TAG)"

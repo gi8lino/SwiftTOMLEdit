@@ -11,10 +11,8 @@ when existing values are changed.
 - Xcode 16 or newer
 
 Rust with `rustup` is only required when changing or testing the native Rust bridge.
-
-The package contains a universal macOS XCFramework so SwiftPM can resolve the native
-library directly from the tagged source. GitHub Actions also publishes the XCFramework
-as a release asset.
+Package consumers do not need Rust: SwiftPM downloads the checksummed XCFramework from
+the corresponding GitHub Release.
 
 ## Add the package
 
@@ -149,25 +147,28 @@ Print its SwiftPM checksum:
 make checksum
 ```
 
-The generated `Artifacts/CSwiftTOMLEdit.xcframework` directory is part of the package and
-must be committed when the Rust bridge changes. Release ZIPs in `dist` are ignored by Git.
+Generated XCFrameworks in `Artifacts` and release ZIPs in `dist` are ignored by Git.
+`make verify` builds a local XCFramework and explicitly tests against it, so native changes
+are verified before release without committing generated binaries.
 
 ## Releases
 
-Create a version tag locally and push it:
+The release pipeline owns artifact creation, checksums, the release commit, and the tag.
+Start it from **Actions → Release → Run workflow**, or use one of:
 
 ```bash
-make tag-patch # or tag-minor / tag-major
-make push-tags
+make release-patch
+make release-minor
+make release-major
+
+# Or choose an exact version:
+make release VERSION=0.1.0
 ```
 
-Pushing a `v*` tag triggers the Release workflow. It checks out that exact tag, builds and
-tests the Rust and Swift code, packages the XCFramework, computes its checksums, and creates
-the GitHub Release with the ZIP, SHA-256, and SwiftPM checksum files. No local artifact
-packaging is needed.
-
-An existing tag can be recovered without moving it from **Actions → Release → Run
-workflow** by entering the full tag, such as `v0.0.2`.
+The workflow builds and tests the Rust and Swift code, packages the XCFramework, calculates
+its SwiftPM checksum, updates `Package.swift` with the release URL metadata, creates the
+final commit and tag, and publishes the GitHub Release. Do not create the release tag
+locally—the pipeline creates it only after the artifact and checksum are ready.
 
 ## License
 
