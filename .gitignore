@@ -5,3 +5,4 @@ Artifacts/CSwiftTOMLEdit.xcframework/
 Rust/SwiftTOMLEdit/target/
 .swiftpm/
 .DS_Store
+bin/.dev-tools/

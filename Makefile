@@ -1,54 +1,26 @@
-PACKAGE_NAME := SwiftTOMLEdit
 ARTIFACT_NAME := CSwiftTOMLEdit.xcframework
 ARTIFACT := Artifacts/$(ARTIFACT_NAME)
 DIST_DIR := dist
 ARTIFACT_ZIP := $(DIST_DIR)/$(ARTIFACT_NAME).zip
 RUST_MANIFEST := Rust/SwiftTOMLEdit/Cargo.toml
 
-VERSION_PREFIX ?= v
-LATEST_TAG := $(shell git tag --list '$(VERSION_PREFIX)*' --sort=-v:refname | head -n 1)
-CURRENT_VERSION := $(if $(LATEST_TAG),$(patsubst $(VERSION_PREFIX)%,%,$(LATEST_TAG)),0.0.0)
-CURRENT_CORE_VERSION := $(firstword $(subst -, ,$(CURRENT_VERSION)))
-
-NEXT_PATCH := $(shell python3 -c 'm,n,p=map(int,"$(CURRENT_CORE_VERSION)".split(".")); print(f"{m}.{n}.{p+1}")')
-NEXT_MINOR := $(shell python3 -c 'm,n,p=map(int,"$(CURRENT_CORE_VERSION)".split(".")); print(f"{m}.{n+1}.0")')
-NEXT_MAJOR := $(shell python3 -c 'm,n,p=map(int,"$(CURRENT_CORE_VERSION)".split(".")); print(f"{m+1}.0.0")')
-
 .DEFAULT_GOAL := help
 
-LOCALBIN ?= bin
-
-$(LOCALBIN):
-	@mkdir -p "$@"
-
-## Tool Versions
 # renovate: datasource=github-releases depName=gi8lino/dev-tools
-DEV_TOOLS_VERSION ?= v0.5.0
+DEV_TOOLS_VERSION ?= v0.7.0
 
-## Tool Binaries
-DEV_TOOL_NAMES := dev-port open-browser dev-tag make-help go-install-tool
-DEV_TOOL_TARGETS := $(addprefix $(LOCALBIN)/,$(DEV_TOOL_NAMES))
-DEV_TOOL_VERSIONED := $(addsuffix -$(DEV_TOOLS_VERSION),$(DEV_TOOL_TARGETS))
+include bin/dev-tools.mk
+include $(call dev-tools-module,help)
 
-DEV_PORT := $(LOCALBIN)/dev-port
-OPEN_BROWSER := $(LOCALBIN)/open-browser
-DEV_TAG := $(LOCALBIN)/dev-tag
-MAKE_HELP := $(LOCALBIN)/make-help
-GO_INSTALL_TOOL := $(LOCALBIN)/go-install-tool
+VERSION_PREFIX ?= v
+DEV_TAG := $(DEV_TOOLS_BIN)/dev-tag
 
-# Run a local tool while displaying only its executable name.
-define run-tool
-@printf '%s\n' '$(notdir $(1)) $(2)'
-@$(1) $(2)
-endef
+$(DEV_TAG): | $(DEV_TOOLS_BIN)
+	$(call download-dev-tool,dev-tag,$@)
 
-
-.PHONY: help \
+.PHONY: \
 	prepare artifact require-artifact test rust-test lint verify package checksum clean clean-all \
 	release release-patch release-minor release-major version
-
-help: $(MAKE_HELP) ## Display this help.
-	@$(MAKE_HELP) $(MAKEFILE_LIST)
 
 prepare: artifact test rust-test lint ## Build everything required before the first commit.
 
@@ -96,41 +68,24 @@ release: ## Start a pipeline-owned release (usage: make release VERSION=0.1.0).
 	@gh workflow run release.yml --ref main --field version="$(VERSION)"
 	@echo "Started release $(VERSION)"
 
-release-patch: VERSION := $(NEXT_PATCH)
-release-patch: release ## Start the next patch release.
+release-patch: ## Start the next patch release.
+release-minor: ## Start the next minor release.
+release-major: ## Start the next major release.
 
-release-minor: VERSION := $(NEXT_MINOR)
-release-minor: release ## Start the next minor release.
+release-patch release-minor release-major: $(DEV_TAG)
+	@set -eu; current="$$($(DEV_TAG) --prefix "$(VERSION_PREFIX)" current)"; \
+	version=$$(printf '%s\n' "$${current#$(VERSION_PREFIX)}" | \
+		awk -F. -v bump="$(@:release-%=%)" '{ \
+			if (bump == "major") print $$1+1 ".0.0"; \
+			else if (bump == "minor") print $$1 "." $$2+1 ".0"; \
+			else print $$1 "." $$2 "." $$3+1; \
+		}'); \
+	$(MAKE) release VERSION="$$version"
 
-release-major: VERSION := $(NEXT_MAJOR)
-release-major: release ## Start the next major release.
-
-version: ## Show the latest released version.
-	@echo "Latest version: $(LATEST_TAG)"
+version: $(DEV_TAG) ## Show the latest released version.
+	$(call run-tool,$(DEV_TAG),--prefix "$(VERSION_PREFIX)" current)
 
 ##@ Development tools
 
 .PHONY: dev-tools
-dev-tools: $(DEV_TOOL_TARGETS) ## Download the pinned development tools.
-
-$(DEV_TOOL_TARGETS): $(LOCALBIN)/%: $(LOCALBIN)/%-$(DEV_TOOLS_VERSION)
-	@ln -sf "$(notdir $<)" "$@"
-
-$(DEV_TOOL_VERSIONED): $(LOCALBIN)/%-$(DEV_TOOLS_VERSION): | $(LOCALBIN)
-	$(call download-dev-tool,$*,$@)
-
-# download-dev-tool downloads a versioned tool from gi8lino/dev-tools.
-# $1 - release asset name
-# $2 - versioned destination path
-define download-dev-tool
-	@set -eu; \
-	tmp="$(2).tmp"; \
-	trap 'rm -f "$$tmp"' EXIT INT TERM; \
-	echo "Downloading gi8lino/dev-tools $(DEV_TOOLS_VERSION) $(1)"; \
-	curl --fail --silent --show-error --location \
-		"https://github.com/gi8lino/dev-tools/releases/download/$(DEV_TOOLS_VERSION)/$(1)" \
-		-o "$$tmp"; \
-	chmod +x "$$tmp"; \
-	mv "$$tmp" "$(2)"; \
-	trap - EXIT INT TERM
-endef
+dev-tools: $(DEV_TAG) $(MAKE_HELP) ## Download the pinned development tools.
