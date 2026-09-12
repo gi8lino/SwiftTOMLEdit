@@ -111,6 +111,25 @@ final class TOMLDocumentTests: XCTestCase {
     XCTAssertFalse(edited.hasSuffix("\n"))
   }
 
+  func testParseAndEditRejectEmbeddedNULWithoutTruncatingSource() {
+    let source = "title = \"Grüezi\"\n\0enabled = true\n"
+    let operations: [() throws -> Void] = [
+      { _ = try TOMLDocument.parse(source) },
+      { _ = try TOMLDocument.edit(source, edits: []) },
+    ]
+    for operation in operations {
+      XCTAssertThrowsError(try operation()) { error in
+        guard let error = error as? TOMLParseError else {
+          return XCTFail("Unexpected error: \(error)")
+        }
+        XCTAssertEqual(error.start, "title = \"Grüezi\"\n".utf8.count)
+        XCTAssertEqual(error.end, error.start.map { $0 + 1 })
+        XCTAssertEqual(error.line, 2)
+        XCTAssertEqual(error.column, 1)
+      }
+    }
+  }
+
   func testParseErrorContainsUnicodeAwareSourceLocation() {
     let source = "title = \"Grüezi\"\n[broken\nvalue = true"
 

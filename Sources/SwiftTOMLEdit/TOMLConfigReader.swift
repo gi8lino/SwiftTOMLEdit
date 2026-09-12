@@ -197,6 +197,10 @@ public struct TOMLConfigReader<Failure: Error> {
       return nil
     }
 
+    guard value.isFinite else {
+      throw makeInvalidValueError(path(for: key), "expected a finite number")
+    }
+
     return try validateBounds(
       value,
       path: path(for: key),
@@ -224,14 +228,7 @@ public struct TOMLConfigReader<Failure: Error> {
     guard let rawValues = try optionalStringArray(key) else { return fallback }
 
     return try rawValues.enumerated().map { index, rawValue in
-      let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-      guard let value = Value(rawValue: normalized) else {
-        throw makeInvalidValueError(
-          "\(path(for: key))[\(index)]",
-          "expected one of \(Value.allowedValues.joined(separator: ", "))"
-        )
-      }
-      return value
+      try requiredEnum(rawValue, path: "\(path(for: key))[\(index)]")
     }
   }
 
@@ -275,16 +272,21 @@ public struct TOMLConfigReader<Failure: Error> {
     fallback: Value? = nil
   ) throws -> Value? {
     guard let rawValue = try optionalString(key) else { return fallback }
+    return try requiredEnum(rawValue, path: path(for: key))
+  }
+
+  private func requiredEnum<Value: TOMLStringDecodable>(
+    _ rawValue: String,
+    path: String
+  ) throws -> Value {
     let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-
-    if let value = Value(rawValue: normalized) {
-      return value
+    guard let value = Value(rawValue: normalized) else {
+      throw makeInvalidValueError(
+        path,
+        "expected one of \(Value.allowedValues.joined(separator: ", "))"
+      )
     }
-
-    throw makeInvalidValueError(
-      path(for: key),
-      "expected one of \(Value.allowedValues.joined(separator: ", "))"
-    )
+    return value
   }
 
   private func optionalDirectSection(_ key: String) throws -> TOMLConfigReader<Failure>? {
@@ -411,10 +413,6 @@ public struct TOMLConfigReader<Failure: Error> {
       number = Double(int)
     } else {
       throw makeInvalidTypeError(path, "number", describe(value))
-    }
-
-    guard number.isFinite else {
-      throw makeInvalidValueError(path, "expected a finite number")
     }
 
     return number

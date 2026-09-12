@@ -58,6 +58,49 @@ final class TOMLConfigReaderTests: XCTestCase {
     }
   }
 
+  func testReaderRejectsNonFiniteNumbersIncludingFallbacks() throws {
+    for value in [Double.nan, .infinity, -.infinity] {
+      let empty = makeReader(TOMLTable())
+      let configured = makeReader(TOMLTable(["ratio": .double(value)]))
+      for reader in [empty, configured] {
+        XCTAssertThrowsError(try reader.double("ratio", fallback: value)) { error in
+          XCTAssertEqual(
+            error as? TestConfigError,
+            .invalidValue(path: "ratio", message: "expected a finite number")
+          )
+        }
+        XCTAssertThrowsError(try reader.optionalDouble("ratio", fallback: value))
+      }
+    }
+  }
+
+  func testReaderResolvesFiniteNumbersAndValidatesFallbackBounds() throws {
+    let reader = makeReader(TOMLTable(["ratio": .integer(2)]))
+    XCTAssertEqual(try reader.double("ratio", fallback: .nan), 2)
+    XCTAssertEqual(try reader.optionalDouble("missing", fallback: 1.5), 1.5)
+    XCTAssertNil(try reader.optionalDouble("missing"))
+    XCTAssertThrowsError(try reader.double("missing", fallback: 3, maximum: 2))
+  }
+
+  func testReaderNormalizesEnumValuesAndReportsArrayIndex() throws {
+    let reader = makeReader(
+      TOMLTable([
+        "mode": .string(" Expanded "),
+        "modes": .array([.string(" COMPACT "), .string("expanded")]),
+        "invalid": .array([.string("compact"), .string("unknown")]),
+      ]))
+    XCTAssertEqual(try reader.enum("mode", fallback: DisplayMode.compact), .expanded)
+    XCTAssertEqual(
+      try reader.enumArray("modes", fallback: [DisplayMode]()), [.compact, .expanded]
+    )
+    XCTAssertThrowsError(try reader.enumArray("invalid", fallback: [DisplayMode]())) { error in
+      XCTAssertEqual(
+        error as? TestConfigError,
+        .invalidValue(path: "invalid[1]", message: "expected one of compact, expanded")
+      )
+    }
+  }
+
   private func makeReader(_ table: TOMLTable) -> TOMLConfigReader<TestConfigError> {
     TOMLConfigReader(
       table: table,

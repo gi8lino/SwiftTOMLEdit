@@ -151,6 +151,7 @@ public enum TOMLDocument {
 
 private enum NativeTOMLBridge {
   static func parse(_ text: String) throws -> TOMLValue {
+    try validateInput(text)
     let response = try call(text) { swift_toml_edit_parse($0) }
     if response["ok"] as? Bool == true, let value = response["value"] {
       return try decodeValue(value)
@@ -159,6 +160,7 @@ private enum NativeTOMLBridge {
   }
 
   static func edit(_ text: String, edits: [TOMLEdit]) throws -> String {
+    try validateInput(text)
     let request = ["edits": edits.map(editObject)]
     let requestData = try JSONSerialization.data(withJSONObject: request, options: [.sortedKeys])
     guard let requestJSON = String(data: requestData, encoding: .utf8) else {
@@ -174,6 +176,19 @@ private enum NativeTOMLBridge {
       return output
     }
     throw decodeError(response, source: text)
+  }
+
+  private static func validateInput(_ text: String) throws {
+    guard let offset = text.utf8.firstIndex(of: 0) else { return }
+    let start = text.utf8.distance(from: text.utf8.startIndex, to: offset)
+    let location = sourceLocation(in: text, utf8Offset: start)
+    throw TOMLParseError(
+      message: "TOML source must not contain NUL characters",
+      start: start,
+      end: start + 1,
+      line: location.line,
+      column: location.column
+    )
   }
 
   private static func call(
