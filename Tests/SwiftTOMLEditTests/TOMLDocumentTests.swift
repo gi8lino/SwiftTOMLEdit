@@ -67,7 +67,7 @@ final class TOMLDocumentTests: XCTestCase {
       edits: [
         TOMLEdit(
           path: ["calendar", "anchor", "fields"],
-          value: .stringArray(["date", "time"])
+          value: .array([.string("date"), .string("time")])
         )
       ]
     )
@@ -78,6 +78,28 @@ final class TOMLDocumentTests: XCTestCase {
       table["calendar"]?.table?["anchor"]?.table?["fields"]?.array?.compactMap(\.string),
       ["date", "time"]
     )
+  }
+
+  func testEditSupportsDatetimeArraysInlineTablesAndRemoval() throws {
+    let source = "remove_me = true\n"
+    let edited = try TOMLDocument.edit(
+      source,
+      edits: [
+        TOMLEdit(path: ["remove_me"], value: .remove),
+        TOMLEdit(path: ["released"], value: .datetime("2026-10-12T08:00:00Z")),
+        TOMLEdit(path: ["numbers"], value: .array([.integer(1), .double(2.5)])),
+        TOMLEdit(
+          path: ["settings"],
+          value: .inlineTable(["enabled": .bool(true), "name": .string("SwiftTOMLEdit")])
+        ),
+      ]
+    )
+    let table = try TOMLTable(string: edited)
+
+    XCTAssertNil(table["remove_me"])
+    XCTAssertEqual(table["released"]?.datetime, "2026-10-12T08:00:00Z")
+    XCTAssertEqual(table["numbers"]?.array?.compactMap(\.int), [1])
+    XCTAssertEqual(table["settings"]?.table?["enabled"]?.bool, true)
   }
 
   func testEditPreservesInlineTablesAndComments() throws {
@@ -142,6 +164,18 @@ final class TOMLDocumentTests: XCTestCase {
       XCTAssertNotNil(parseError.column)
       XCTAssertFalse(parseError.message.isEmpty)
       XCTAssertNotNil(parseError.start)
+    }
+  }
+
+  func testParseErrorColumnCountsCharactersInsteadOfUTF8Bytes() {
+    let source = "title = \"Grüezi\" invalid"
+
+    XCTAssertThrowsError(try TOMLTable(string: source)) { error in
+      guard let parseError = error as? TOMLParseError else {
+        return XCTFail("Unexpected error: \(error)")
+      }
+      XCTAssertEqual(parseError.line, 1)
+      XCTAssertEqual(parseError.column, 18)
     }
   }
 }

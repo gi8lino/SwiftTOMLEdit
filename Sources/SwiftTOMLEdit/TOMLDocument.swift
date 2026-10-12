@@ -109,11 +109,16 @@ public struct TOMLTable: Sendable, Equatable, Sequence {
 
 /// One lossless TOML update applied at a key path.
 public struct TOMLEdit: Sendable, Equatable {
-  public enum Value: Sendable, Equatable {
+  public indirect enum Value: Sendable, Equatable {
     case string(String)
     case integer(Int)
     case double(Double)
     case bool(Bool)
+    case datetime(String)
+    case array([Value])
+    case inlineTable([String: Value])
+    case remove
+    @available(*, deprecated, message: "Use .array([.string(...)]) instead.")
     case stringArray([String])
   }
 
@@ -247,15 +252,23 @@ private enum NativeTOMLBridge {
   }
 
   private static func editObject(_ edit: TOMLEdit) -> [String: Any] {
-    let encoded: [String: Any]
-    switch edit.value {
-    case .string(let value): encoded = ["kind": "string", "value": value]
-    case .integer(let value): encoded = ["kind": "integer", "value": value]
-    case .double(let value): encoded = ["kind": "float", "value": value]
-    case .bool(let value): encoded = ["kind": "boolean", "value": value]
-    case .stringArray(let value): encoded = ["kind": "string_array", "value": value]
+    ["path": edit.path, "value": editValueObject(edit.value)]
+  }
+
+  private static func editValueObject(_ value: TOMLEdit.Value) -> [String: Any] {
+    switch value {
+    case .string(let value): return ["kind": "string", "value": value]
+    case .integer(let value): return ["kind": "integer", "value": value]
+    case .double(let value): return ["kind": "float", "value": value]
+    case .bool(let value): return ["kind": "boolean", "value": value]
+    case .datetime(let value): return ["kind": "datetime", "value": value]
+    case .array(let values): return ["kind": "array", "value": values.map(editValueObject)]
+    case .inlineTable(let values):
+      return ["kind": "inline_table", "value": values.mapValues(editValueObject)]
+    case .remove: return ["kind": "remove"]
+    case .stringArray(let values):
+      return ["kind": "array", "value": values.map { editValueObject(.string($0)) }]
     }
-    return ["path": edit.path, "value": encoded]
   }
 
   private static func decodeError(_ response: [String: Any], source: String) -> TOMLParseError {
@@ -274,9 +287,12 @@ private enum NativeTOMLBridge {
 
   private static func sourceLocation(in source: String, utf8Offset: Int) -> (line: Int, column: Int)
   {
-    let bytes = Array(source.utf8.prefix(max(0, utf8Offset)))
-    let line = bytes.reduce(1) { $1 == 10 ? $0 + 1 : $0 }
-    let column = bytes.lastIndex(of: 10).map { bytes.count - $0 } ?? (bytes.count + 1)
+    let prefix = String(decoding: source.utf8.prefix(max(0, utf8Offset)), as: UTF8.self)
+    let line = prefix.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }
+    let column =
+      prefix.lastIndex(of: "\n").map {
+        prefix.distance(from: $0, to: prefix.endIndex)
+      } ?? (prefix.count + 1)
     return (line, column)
   }
 

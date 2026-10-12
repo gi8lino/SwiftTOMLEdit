@@ -96,9 +96,15 @@ Supported edit values are:
 - integers
 - doubles
 - booleans
-- string arrays
+- TOML datetime literals
+- arrays of supported values
+- inline tables of supported values
+- key removal
 
 Missing tables in an edit path are created automatically.
+
+Scalar replacements preserve surrounding whitespace and inline comments. Replacing an array or
+inline table preserves the property's surrounding decoration, but may reformat that compound value.
 
 ## Configuration reader
 

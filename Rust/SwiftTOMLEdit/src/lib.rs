@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_char};
-use toml_edit::{Array, DocumentMut, Item, Table, Value, value as toml_value};
+use toml_edit::{
+    Array, Datetime, DocumentMut, InlineTable, Item, Table, Value, value as toml_value,
+};
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
@@ -56,7 +58,10 @@ enum EditValue {
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    StringArray(Vec<String>),
+    Datetime(String),
+    Array(Vec<EditValue>),
+    InlineTable(BTreeMap<String, EditValue>),
+    Remove,
 }
 
 fn table_value(table: &Table) -> BridgeValue {
@@ -150,19 +155,41 @@ unsafe fn input_string(input: *const c_char) -> Result<String, BridgeError> {
     String::from_utf8(bytes.to_vec()).map_err(|_| bridge_error("input is not valid UTF-8"))
 }
 
-fn edit_item(edit_value: EditValue) -> Item {
+fn edit_item(edit_value: EditValue) -> Result<Item, BridgeError> {
     match edit_value {
-        EditValue::String(value) => toml_value(value),
-        EditValue::Integer(value) => toml_value(value),
-        EditValue::Float(value) => toml_value(value),
-        EditValue::Boolean(value) => toml_value(value),
-        EditValue::StringArray(values) => {
+        EditValue::String(value) => Ok(toml_value(value)),
+        EditValue::Integer(value) => Ok(toml_value(value)),
+        EditValue::Float(value) => Ok(toml_value(value)),
+        EditValue::Boolean(value) => Ok(toml_value(value)),
+        EditValue::Datetime(value) => {
+            let datetime = value
+                .parse::<Datetime>()
+                .map_err(|error| bridge_error(format!("invalid TOML datetime: {error}")))?;
+            Ok(Item::Value(Value::from(datetime)))
+        }
+        EditValue::Array(values) => {
             let mut array = Array::new();
             for value in values {
+                let item = edit_item(value)?;
+                let value = item
+                    .into_value()
+                    .map_err(|_| bridge_error("arrays cannot contain removals"))?;
                 array.push(value);
             }
-            Item::Value(Value::Array(array))
+            Ok(Item::Value(Value::Array(array)))
         }
+        EditValue::InlineTable(values) => {
+            let mut table = InlineTable::new();
+            for (key, value) in values {
+                let item = edit_item(value)?;
+                let value = item
+                    .into_value()
+                    .map_err(|_| bridge_error("inline tables cannot contain removals"))?;
+                table.insert(&key, value);
+            }
+            Ok(Item::Value(Value::InlineTable(table)))
+        }
+        EditValue::Remove => Ok(Item::None),
     }
 }
 
@@ -183,7 +210,12 @@ fn apply_edit(document: &mut DocumentMut, edit: Edit) -> Result<(), BridgeError>
             .ok_or_else(|| bridge_error(format!("{component} is not a TOML table")))?;
     }
 
-    let mut replacement = edit_item(edit.value);
+    if matches!(edit.value, EditValue::Remove) {
+        table.remove(key);
+        return Ok(());
+    }
+
+    let mut replacement = edit_item(edit.value)?;
     if let Some((_formatted_key, existing)) = table.get_key_value_mut(key) {
         if let (Some(existing_value), Some(replacement_value)) =
             (existing.as_value(), replacement.as_value_mut())
@@ -306,7 +338,7 @@ count = 3
 
     #[test]
     fn edit_adds_missing_tables() {
-        let request = r#"{"edits":[{"path":["app","ui","fields"],"value":{"kind":"string_array","value":["date","time"]}}]}"#;
+        let request = r#"{"edits":[{"path":["app","ui","fields"],"value":{"kind":"array","value":[{"kind":"string","value":"date"},{"kind":"string","value":"time"}]}}]}"#;
 
         let output = edit_text("", request).expect("edit should succeed");
         let parsed = output
