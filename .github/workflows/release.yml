@@ -2,11 +2,9 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: Version to release (for example, 0.1.0)
-        required: true
-        type: string
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
