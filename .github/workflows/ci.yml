@@ -41,6 +41,9 @@ jobs:
           restore-keys: |
             rust-${{ runner.os }}-${{ runner.arch }}-
 
+      - name: Test immutable release preparation
+        run: python3 scripts/test-release.py
+
       - name: Regenerate and test
         run: make verify
 
