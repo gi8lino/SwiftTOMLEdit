@@ -8,8 +8,8 @@ let strictConcurrencySettings: [SwiftSetting] = [
 ]
 
 // The release workflow updates these values before creating each version tag.
-let releaseTag = "v0.2.2"
-let releaseChecksum = "5366a33b22974a2410da77123d31953335e822117ac9bb5c95c14746512a0578"
+let releaseTag = "v0.2.3"
+let releaseChecksum = "8dac84c7d14714c441cecc2113b48d1fc2b56a6cebeb6efe9348d5a587ff640a"
 
 let nativeTarget: Target =
   ProcessInfo.processInfo.environment["SWIFT_TOML_EDIT_USE_LOCAL_ARTIFACT"] == "1"
